@@ -28,7 +28,10 @@ On Windows 10 system:
    command: ns question1.tcl
    
  Generating TCP Packet drop count
- - run the file 
+ - run the file countlostpacktCubic.tcl using
+     - tclsh countlostpacktCubic.tcl
+ - run the file countlostpacktReno.tcl using
+     - tclsh countlostpacktReno.tcl
    
 Note: for generating TCP Reno and TCP Cubic graphs and traces, open the source code and comment the lines mentioned.
       
