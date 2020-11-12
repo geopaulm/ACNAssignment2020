@@ -27,5 +27,8 @@ On Windows 10 system:
  - run the simulation
    command: ns question1.tcl
    
+ Generating TCP Packet drop count
+ - run the file 
+   
 Note: for generating TCP Reno and TCP Cubic graphs and traces, open the source code and comment the lines mentioned.
       
