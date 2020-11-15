@@ -1,0 +1,24 @@
+Write your observation/analysis based on packet dropped count and congestion window plots for TCP Reno and TCP Cubic variants.
+
+Answer:
+
+a. The packet dropped count changes with the change in Queue Limit for the links. As the queue limit is decreased '
+   the drop count increases and when the queue limit in increased, the drop count is seen to decrease.
+
+   The drop count for TCPCubic is higher than TCP Reno.
+
+   For example: For a Queue-limit of 10 between n2 and n3 and n3 and n5, the drop counts are:
+                TCP Reno: 22
+                TCP Cubic: 27
+
+b. TCP-Reno uses slow start, congestion avoidance, and fast retransmit triggered by triple duplicate ACKs. Reno uses
+   packet loss to detect network congestion.
+   TCP-CUBIC congestion window is a cubic function of time since the last packet loss, with the inflection 
+   point set to the window prior to the congestion event. 
+   
+   There are two components to window growth. The first is a concave portion where the 
+   window quickly ramps up to the window size as it was before the previous congestion event. 
+   Next is a convex growth where CUBIC probes for more bandwidth, slowly at first then very rapidly. 
+
+   CUBIC spends a lot of time at a plateau between the concave and convex growth region which allows the 
+   network to stabilize before CUBIC begins looking for more bandwidth.
