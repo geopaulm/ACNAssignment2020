@@ -7,7 +7,7 @@ $ns color 2 Red
 $ns color 3 Green
 
 # set to "cubic" for cubic results
-set algorithm "reno"
+set algorithm "cubic"
 
 set nf [open outReno.nam w]
 set tf [open TCPReno.tr w]
