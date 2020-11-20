@@ -6,11 +6,12 @@ $ns color 1 Blue
 $ns color 2 Red
 $ns color 3 Green
 
-set algorithm "reno" # set to cubic for cubic results
+# set to "cubic" for cubic results
+set algorithm "reno"
 
 set nf [open outReno.nam w]
 set tf [open TCPReno.tr w]
-if {[string compare $algorithm "cubic"] == 0} {
+if {$algorithm eq "cubic"} {
 	set nf [open TCPCubic.nam w]
 	set tf [open TCPCubic.tr w]
 }
@@ -36,19 +37,22 @@ $ns at [expr $now + 0.1] "plotWindow $tcpSource $outfile"
 
 #Define a 'finish' procedure
 proc finish {} {
-	global ns nf tf
+	global ns nf tf algorithm
 	$ns flush-trace
 	#Close the NAM trace file
 	close $nf
 	#Close the trace file
 	close $tf
-	if {[string compare $algorithm "cubic"] == 0} { 
+	if {$algorithm eq "cubic"} { 
 		exec nam outCubic.nam &
 		exec xgraph congestionCubic.xg -geometry 300x300 &
 	} else {
 		exec nam outReno.nam &
 		exec xgraph congestionReno.xg -geometry 300x300 &
 	}
+}
+
+proc doExit{} {
 	exit 0
 }
 
@@ -107,14 +111,18 @@ $cbr4 set interval_ 0.005
 $cbr4 attach-agent $udp4
 
 #Create a TCP agent and attach it to node n1
-#uncomment below line when running for TCP Cubic
-#set tcp1 [new Agent/TCP/Linux]
-#uncomment below line when running for TCP Reno
-set tcp1 [new Agent/TCP/Reno]
+if {$algorithm eq "cubic"} {
+	set tcp1 [new Agent/TCP/Linux]
+} else {
+	set tcp1 [new Agent/TCP/Reno]
+}
+
 $tcp1 set class_ 2
 $tcp1 set fid_ 2
-#uncomment below line when running for TCP Cubic
-#$ns at 0 "$tcp1 select_ca cubic"
+if {$algorithm eq "cubic"} {
+	$ns at 0 "$tcp1 select_ca cubic"
+} 
+
 $ns attach-agent $n1 $tcp1
 
 #Create a FTP traffic source and attach to tcp1
@@ -150,6 +158,11 @@ $ns at 19.0 "$ns detach-agent $n1 $tcp1 ; $ns detach-agent $n6 $sink6"
 #Call the finish procedure after 20 seconds of simulation time
 $ns at 20.0 "finish"
 
+$ns at 21.0 "FindPacketsDropped"
+$ns at 22.0 "doExit"
+
+
+
 #Print CBR packet size and interval
 puts "CBR packet size for n0 = [$cbr0 set packet_size_]"
 puts "CBR interval n0 = [$cbr0 set interval_]"
@@ -158,9 +171,12 @@ puts "CBR packet size for n4 = [$cbr4 set packet_size_]"
 puts "CBR interval n4 = [$cbr4 set interval_]"
 
 #Uncomment below line to Generate graph for TCP Reno congestion
-set outfile [open "congestionReno.xg" w]
-#Uncomment below line to Generate graph for TCP Cubic congestion
-#set outfile [open "congestionCubic.xg" w]
+if {$algorithm eq "cubic"} {
+	set outfile [open "congestionCubic.xg" w]
+} else {
+	set outfile [open "congestionReno.xg" w]
+}
+
 $ns at 0.0 "plotWindow $tcp1 $outfile"
 
 #Run the simulation
@@ -173,32 +189,38 @@ $ns run
 # 3. Counts the dropped packets.
 # 4. Prints the value.
 ########################################################################
-#Uncomment below line for TCP Reno
-#set fid [open TCPReno.tr]
-#Uncomment below line for TCP Cubic
-#set fid [open TCPCubic.tr]
-#set trace [read $fid]
-#close $fid
-#
-## Split into records on newlines
-#set records [split $trace "\n"]
-#
-#set packtdropped 0
-#
-##Iterate over the records
-#foreach rec $records {
-#
-#     # Split the records to fields with space as separator
-#     set fields [split $rec " "]
-#    
-#     # Assign fields to variables and count the dropped packets for tcp
-#     lassign $fields \
-#       event time fnode tnode pkttyp psize flags fid saddr daddr snum pid
-#
-#       if { $pkttyp == "tcp" && $event == "d"
-#       } then {
-#          incr packtdropped 
-#       }
-#}
-#puts "Total packets dropped for TCP Cubic is: $packtdropped"
+proc FindPacketsDropped {} {
+	global $algorithm
+	if {$algorithm eq "reno"} {
+		set fid [open TCPReno.tr]
+	} else {
+		set fid [open TCPCubic.tr]
+	}
+	
+	set trace [read $fid]
+	close $fid	
+
+	# Split into records on newlines
+	set records [split $trace "\n"]	
+
+	set packtdropped 0	
+
+	#Iterate over the records
+	foreach rec $records {	
+
+	     # Split the records to fields with space as separator
+	     set fields [split $rec " "]
+	    
+	     # Assign fields to variables and count the dropped packets for tcp
+	     lassign $fields \
+	       event time fnode tnode pkttyp psize flags fid saddr daddr snum pid	
+
+	       if { $pkttyp == "tcp" && $event == "d"
+	       } then {
+	          incr packtdropped 
+	       }
+	}
+	puts "Total packets dropped for TCP $algorithm is: $packtdropped"
+}
+
 
