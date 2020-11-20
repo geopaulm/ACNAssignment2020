@@ -52,7 +52,7 @@ proc finish {} {
 	}
 }
 
-proc doExit{} {
+proc doExit {} {
 	exit 0
 }
 
