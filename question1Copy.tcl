@@ -64,7 +64,7 @@ proc doExit {} {
 # 4. Prints the value.
 ########################################################################
 proc findPacketsDropped {} {
-	global $algorithm
+	global algorithm
 	if {$algorithm eq "reno"} {
 		set fid [open TCPReno.tr]
 	} else {
