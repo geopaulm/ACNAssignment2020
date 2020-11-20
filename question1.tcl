@@ -1,35 +1,3 @@
-###########################################################################
-# The below TCL script simulates a network topology in a ns-2 simulator:
-# 
-# 1. There are nodes from n0 to n7.
-# 2. All links are duplex with 2ms delay and DropTail queue.
-# 3. 1Mb bandwidth between n0-n2, n1-n2, n4-n3, n5-n6, n5-n7
-# 4. 700kb bandwidth between n2-n3, n3-n5
-# 5. 3 data sources. 2 UDP sources and 1 TCP.
-# 6. UDP Sources:
-#    a. Application Traffic - CBR
-#    b. Packet Size = 500 Bytes
-#    c. Interval = 0.005 Sec
-#    d. Start at 8 Sec
-#    e. End at 13 Sec
-# 7. TCP Source:
-#    a. Application Traffic - FTP
-#    b. Start at 1 Sec
-#    c. End at 19 Sec
-# 8. Different colors for different traffic flows
-# 9. NAM and Trace enabled
-# 10. Enable Script for both TCP Reno and TCP Cubic variants.
-#
-# Functions added:
-#  - plotWindow
-#    - This function generates a congestion graph.
-#    - This is done for both TCP Reno and TCP Cubic variants.
-#    - Generated for every 0.1 second interval.
-# 
-# Scripts added:
-#  - packet dropped count for TCP Reno and TCP Cubic variants.
-# ########################################################################
-
 #Create a simulator object
 set ns [new Simulator]
 
@@ -38,50 +6,95 @@ $ns color 1 Blue
 $ns color 2 Red
 $ns color 3 Green
 
-#Open the NAM trace file
-#Uncomment below line for TCP Reno Simulation
+# set to "cubic" for cubic results
+set algorithm "reno"
+
 set nf [open outReno.nam w]
-#Uncomment below line for TCP Cubic Simulation
-#set nf [open outCubic.nam w]
-$ns namtrace-all $nf
-#Uncomment below line for TCP Cubic
-#set tf [open TCPCubic.tr w]
-#Uncomment below line for TCP Reno
 set tf [open TCPReno.tr w]
+if {$algorithm eq "cubic"} {
+	set nf [open TCPCubic.nam w]
+	set tf [open TCPCubic.tr w]
+}
+
+$ns namtrace-all $nf
 $ns trace-all $tf
+
 
 #Set session routing policy for all nodes
 $ns rtproto Session
 
 #Procedure to plot the congestion window
 proc plotWindow {tcpSource outfile} {
-  global ns
-  set now [$ns now]
-  set cwnd [$tcpSource set cwnd_]
+	global ns
+	set now [$ns now]
+	set cwnd [$tcpSource set cwnd_]
 
 #the data is recorded in a file called congestionReno.xg for TCP Reno
 #the date is recorded in a file called congestionCubic.xg for TCP Cubic
-  puts $outfile "$now $cwnd"
-  $ns at [expr $now + 0.1] "plotWindow $tcpSource $outfile"
+puts $outfile "$now $cwnd"
+$ns at [expr $now + 0.1] "plotWindow $tcpSource $outfile"
 }
 
-#Define a 'finish' procedure
-proc finish {} {
-        global ns nf tf
-        $ns flush-trace
-        #Close the NAM trace file
-        close $nf
-        #Close the trace file
-        close $tf
-        #Uncomment below line for TCP Reno
-        exec nam outReno.nam &
-        #Uncomment below line for TCP Cubic
-        #exec nam outCubic.nam &
-        #Uncomment below line for opening xgraph for TCP Reno
-        exec xgraph congestionReno.xg -geometry 300x300 &
-        #Uncomment below line for opening xgraph for TCP Cubic
-        #exec xgraph congestionCubic.xg -geometry 300x300 &
-        exit 0
+#Define a 'drawGraph' procedure
+proc drawGraph {} {
+	global ns nf tf algorithm
+	$ns flush-trace
+	#Close the NAM trace file
+	close $nf
+	#Close the trace file
+	close $tf
+	if {$algorithm eq "cubic"} { 
+		exec nam outCubic.nam &
+		exec xgraph congestionCubic.xg -geometry 300x300 &
+	} else {
+		exec nam outReno.nam &
+		exec xgraph congestionReno.xg -geometry 300x300 &
+	}
+}
+
+proc doExit {} {
+	exit 0
+}
+
+#########################################################################
+# The below proc does the following:
+# 1. Opens the trace file generated for a TCP Variant (Reno/Cubic)
+# 2. Analyzes each line for "Drop" event and TCP Packet Type.
+# 3. Counts the dropped packets.
+# 4. Prints the value.
+########################################################################
+proc findPacketsDropped {} {
+	global algorithm
+	if {$algorithm eq "reno"} {
+		set fid [open TCPReno.tr]
+	} else {
+		set fid [open TCPCubic.tr]
+	}
+	
+	set trace [read $fid]
+	close $fid	
+
+	# Split into records on newlines
+	set records [split $trace "\n"]	
+
+	set packtdropped 0	
+
+	#Iterate over the records
+	foreach rec $records {	
+
+	     # Split the records to fields with space as separator
+	     set fields [split $rec " "]
+	    
+	     # Assign fields to variables and count the dropped packets for tcp
+	     lassign $fields \
+	       event time fnode tnode pkttyp psize flags fid saddr daddr snum pid	
+
+	       if { $pkttyp == "tcp" && $event == "d"
+	       } then {
+	          incr packtdropped 
+	       }
+	}
+	puts "Total packets dropped for TCP $algorithm is: $packtdropped"
 }
 
 #Create eight nodes
@@ -139,14 +152,18 @@ $cbr4 set interval_ 0.005
 $cbr4 attach-agent $udp4
 
 #Create a TCP agent and attach it to node n1
-#uncomment below line when running for TCP Cubic
-#set tcp1 [new Agent/TCP/Linux]
-#uncomment below line when running for TCP Reno
-set tcp1 [new Agent/TCP/Reno]
+if {$algorithm eq "cubic"} {
+	set tcp1 [new Agent/TCP/Linux]
+} else {
+	set tcp1 [new Agent/TCP/Reno]
+}
+
 $tcp1 set class_ 2
 $tcp1 set fid_ 2
-#uncomment below line when running for TCP Cubic
-#$ns at 0 "$tcp1 select_ca cubic"
+if {$algorithm eq "cubic"} {
+	$ns at 0 "$tcp1 select_ca cubic"
+} 
+
 $ns attach-agent $n1 $tcp1
 
 #Create a FTP traffic source and attach to tcp1
@@ -179,8 +196,16 @@ $ns at 13.0 "$cbr4 stop"
 #Detach tcp and sink agents (not really necessary)
 $ns at 19.0 "$ns detach-agent $n1 $tcp1 ; $ns detach-agent $n6 $sink6"
 
-#Call the finish procedure after 20 seconds of simulation time
-$ns at 20.0 "finish"
+#find packets dropped
+$ns at 20.0 "findPacketsDropped"
+
+#draw graph
+$ns at 21.0 "drawGraph"
+
+#Call the exit procedure after 21 seconds of simulation time
+$ns at 22.0 "doExit"
+
+
 
 #Print CBR packet size and interval
 puts "CBR packet size for n0 = [$cbr0 set packet_size_]"
@@ -190,47 +215,45 @@ puts "CBR packet size for n4 = [$cbr4 set packet_size_]"
 puts "CBR interval n4 = [$cbr4 set interval_]"
 
 #Uncomment below line to Generate graph for TCP Reno congestion
-set outfile [open "congestionReno.xg" w]
-#Uncomment below line to Generate graph for TCP Cubic congestion
-#set outfile [open "congestionCubic.xg" w]
+if {$algorithm eq "cubic"} {
+	set outfile [open "congestionCubic.xg" w]
+} else {
+	set outfile [open "congestionReno.xg" w]
+}
+
 $ns at 0.0 "plotWindow $tcp1 $outfile"
 
 #Run the simulation
 $ns run
 
-#########################################################################
-# The below script does the following:
-# 1. Opens the trace file generated for a TCP Variant (Reno/Cubic)
-# 2. Analyzes each line for "Drop" event and TCP Packet Type.
-# 3. Counts the dropped packets.
-# 4. Prints the value.
-########################################################################
-#Uncomment below line for TCP Reno
-#set fid [open TCPReno.tr]
-#Uncomment below line for TCP Cubic
-#set fid [open TCPCubic.tr]
-#set trace [read $fid]
-#close $fid
-#
-## Split into records on newlines
-#set records [split $trace "\n"]
-#
-#set packtdropped 0
-#
-##Iterate over the records
-#foreach rec $records {
-#
-#     # Split the records to fields with space as separator
-#     set fields [split $rec " "]
-#    
-#     # Assign fields to variables and count the dropped packets for tcp
-#     lassign $fields \
-#       event time fnode tnode pkttyp psize flags fid saddr daddr snum pid
-#
-#       if { $pkttyp == "tcp" && $event == "d"
-#       } then {
-#          incr packtdropped 
-#       }
-#}
-#puts "Total packets dropped for TCP Cubic is: $packtdropped"
+# script for calculating packet drops
+# if {$algorithm eq "reno"} {
+# 	set fid [open TCPReno.tr]
+# } else {
+# 	set fid [open TCPCubic.tr]
+# }
+
+# set trace [read $fid]
+# close $fid	
+
+# # Split into records on newlines
+# set records [split $trace "\n"]	
+
+# set packtdropped 0	
+
+# #Iterate over the records
+# foreach rec $records {	
+# 	# Split the records to fields with space as separator
+# 	set fields [split $rec " "]
+	    
+# 	# Assign fields to variables and count the dropped packets for tcp
+# 	lassign $fields \
+# 	    event time fnode tnode pkttyp psize flags fid saddr daddr snum pid	
+
+# 	if { $pkttyp == "tcp" && $event == "d"
+# 	} then {
+# 	   incr packtdropped 
+# 	}
+# }
+# puts "Total packets dropped for TCP $algorithm is: $packtdropped"
 
