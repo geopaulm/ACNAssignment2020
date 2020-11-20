@@ -35,8 +35,8 @@ puts $outfile "$now $cwnd"
 $ns at [expr $now + 0.1] "plotWindow $tcpSource $outfile"
 }
 
-#Define a 'finish' procedure
-proc finish {} {
+#Define a 'drawGraph' procedure
+proc drawGraph {} {
 	global ns nf tf algorithm
 	$ns flush-trace
 	#Close the NAM trace file
@@ -196,10 +196,13 @@ $ns at 13.0 "$cbr4 stop"
 #Detach tcp and sink agents (not really necessary)
 $ns at 19.0 "$ns detach-agent $n1 $tcp1 ; $ns detach-agent $n6 $sink6"
 
-#Call the finish procedure after 20 seconds of simulation time
-$ns at 20.0 "finish"
+#find packets dropped
+$ns at 20.0 "findPacketsDropped"
 
-$ns at 21.0 "findPacketsDropped"
+#draw graph
+$ns at 21.0 "drawGraph"
+
+#Call the exit procedure after 21 seconds of simulation time
 $ns at 22.0 "doExit"
 
 
